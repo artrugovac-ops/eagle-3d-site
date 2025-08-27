@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AZR • Illyrian Eagle 3D</title>
-  <meta name="description" content="Ultra‑lean Three.js viewer for the Illyrian eagle. Drag to orbit, scroll to zoom." />
+  <meta name="description" content="Ultra-lean Three.js viewer for the Illyrian eagle. Drag to orbit, scroll to zoom." />
+
+  <!-- Import map: resolves bare imports to CDN files -->
   <script type="importmap">
   {
     "imports": {
@@ -13,6 +15,7 @@
     }
   }
   </script>
+
   <link rel="icon" href="favicon.ico">
   <style>
     :root{--bg:#0b0b0d;--fg:#eef1f6;--muted:#9aa1ad;--ring:#262630}
@@ -32,14 +35,13 @@
     .bar{width:min(360px,80vw);height:6px;background:#1a1a22;border:1px solid #2a2a35;border-radius:999px;overflow:hidden}
     .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#4fc3f7,#81c784,#fdd835)}
     footer{position:fixed;right:12px;bottom:12px;background:rgba(19,19,24,.72);border:1px solid var(--ring);padding:8px 10px;border-radius:12px;color:var(--muted);font-size:12px}
-    a{color:#dfe3ff;text-decoration:none;border-bottom:1px dotted #4b4b55}
     #error{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#2a1b1b;color:#ffdede;border:1px solid #4b2e2e;padding:12px 14px;border-radius:12px;display:none;max-width:92vw}
   </style>
 </head>
 <body>
   <div id="hud">
     <h1>AZR Illyrian Eagle</h1>
-    <p>Drag to orbit • Scroll to zoom • Double‑tap to reframe</p>
+    <p>Drag to orbit • Scroll to zoom • Double-tap to reframe</p>
   </div>
   <div id="wrap">
     <canvas id="c"></canvas>
@@ -50,21 +52,18 @@
     </div>
     <div id="error"></div>
   </div>
-  <footer>© AZR Auto Group • Pages‑ready</footer>
+  <footer>© AZR Auto Group • Pages-ready</footer>
 
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    const CONFIG = {
-      modelPath: new URL('assets/eagle.glb', location.href).href,
-      shadowMap: true,
-      dprMax: 2,
-      autoRotate: false,
-      toneMappingExposure: 1.0
-    };
+    // ---- Config ----
+    const MODEL_URL = 'assets/eagle.glb';
 
+    // ---- Core ----
     const canvas = document.getElementById('c');
     const loaderEl = document.getElementById('loader');
     const barEl = document.getElementById('bar');
@@ -72,12 +71,12 @@
     const errorEl = document.getElementById('error');
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.dprMax));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = CONFIG.toneMappingExposure;
-    renderer.shadowMap.enabled = CONFIG.shadowMap;
+    renderer.toneMappingExposure = 1.0;
+    renderer.shadowMap.enabled = true;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0b0d);
@@ -92,8 +91,6 @@
     controls.maxDistance = 6;
     controls.maxPolarAngle = Math.PI * 0.495;
     controls.target.set(0, 0.15, 0);
-    controls.autoRotate = CONFIG.autoRotate;
-    controls.autoRotateSpeed = 0.6;
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x111122, 0.9));
     const dir = new THREE.DirectionalLight(0xffffff, 1.25);
@@ -111,10 +108,17 @@
     floor.position.y = -0.001;
     scene.add(floor);
 
-    let model;
+    // ---- Loaders (GLTF + DRACO) ----
     const gltfLoader = new GLTFLoader();
+    const draco = new DRACOLoader();
+    // Use the DRACO decoders hosted with three examples:
+    draco.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
+    gltfLoader.setDRACOLoader(draco);
+
+    let model;
+
     gltfLoader.load(
-      CONFIG.modelPath,
+      MODEL_URL,
       (gltf)=>{
         model = gltf.scene;
         model.traverse(o=>{
@@ -155,10 +159,7 @@
     }
 
     function hideLoader(){ loaderEl.classList.add('hidden'); }
-    function showError(msg){
-      errorEl.textContent = msg;
-      errorEl.style.display = 'block';
-    }
+    function showError(msg){ errorEl.textContent = msg; errorEl.style.display = 'block'; }
 
     let resizePending = false;
     addEventListener('resize', ()=>{
