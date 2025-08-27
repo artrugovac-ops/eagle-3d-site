@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AZR • Illyrian Eagle 3D</title>
+  <meta name="description" content="Ultra‑lean Three.js viewer for the Illyrian eagle. Drag to orbit, scroll to zoom." />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <link rel="icon" href="favicon.ico">
+  <style>
+    :root{--bg:#0b0b0d;--fg:#eef1f6;--muted:#9aa1ad;--ring:#262630}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{background:var(--bg);color:var(--fg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    #hud{position:fixed;left:12px;top:12px;background:rgba(19,19,24,.72);backdrop-filter:blur(8px);border:1px solid var(--ring);padding:10px 12px;border-radius:14px}
+    #hud h1{margin:0 0 2px;font-size:16px}
+    #hud p{margin:0;color:var(--muted);font-size:12px}
+    #wrap{position:fixed;inset:0}
+    canvas{display:block;width:100%;height:100%}
+    #loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+      background:linear-gradient(180deg, rgba(11,11,13,.92), rgba(11,11,13,.55));transition:opacity .3s ease}
+    #loader.hidden{opacity:0;pointer-events:none}
+    .spinner{width:36px;height:36px;border-radius:999px;border:3px solid #2a2a35;border-top-color:#fff;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .bar{width:min(360px,80vw);height:6px;background:#1a1a22;border:1px solid #2a2a35;border-radius:999px;overflow:hidden}
+    .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#4fc3f7,#81c784,#fdd835)}
+    footer{position:fixed;right:12px;bottom:12px;background:rgba(19,19,24,.72);border:1px solid var(--ring);padding:8px 10px;border-radius:12px;color:var(--muted);font-size:12px}
+    a{color:#dfe3ff;text-decoration:none;border-bottom:1px dotted #4b4b55}
+    #error{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#2a1b1b;color:#ffdede;border:1px solid #4b2e2e;padding:12px 14px;border-radius:12px;display:none;max-width:92vw}
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <h1>AZR Illyrian Eagle</h1>
+    <p>Drag to orbit • Scroll to zoom • Double‑tap to reframe</p>
+  </div>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="loader">
+      <div class="spinner"></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div id="status">Loading…</div>
+    </div>
+    <div id="error"></div>
+  </div>
+  <footer>© AZR Auto Group • Pages‑ready</footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const CONFIG = {
+      modelPath: new URL('assets/eagle.glb', location.href).href,
+      shadowMap: true,
+      dprMax: 2,
+      autoRotate: false,
+      toneMappingExposure: 1.0
+    };
+
+    const canvas = document.getElementById('c');
+    const loaderEl = document.getElementById('loader');
+    const barEl = document.getElementById('bar');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.dprMax));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = CONFIG.toneMappingExposure;
+    renderer.shadowMap.enabled = CONFIG.shadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0b0d);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.05, 2000);
+    camera.position.set(0.8, 0.7, 1.4);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 0.45;
+    controls.maxDistance = 6;
+    controls.maxPolarAngle = Math.PI * 0.495;
+    controls.target.set(0, 0.15, 0);
+    controls.autoRotate = CONFIG.autoRotate;
+    controls.autoRotateSpeed = 0.6;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x111122, 0.9));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.25);
+    dir.position.set(2.5, 3.4, 2.0);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    scene.add(dir);
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(4, 64),
+      new THREE.MeshStandardMaterial({ color:0x0f0f13, roughness:0.95, metalness:0.05 })
+    );
+    floor.receiveShadow = true;
+    floor.rotation.x = -Math.PI/2;
+    floor.position.y = -0.001;
+    scene.add(floor);
+
+    let model;
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(
+      CONFIG.modelPath,
+      (gltf)=>{
+        model = gltf.scene;
+        model.traverse(o=>{
+          if (o.isMesh) {
+            o.castShadow = true; o.receiveShadow = true;
+            if (o.material && o.material.metalness !== undefined) {
+              o.material.metalness = Math.min(0.85, o.material.metalness ?? 0.2);
+              o.material.roughness = Math.max(0.25, o.material.roughness ?? 0.4);
+            }
+          }
+        });
+        scene.add(model);
+        frameObject(model);
+        hideLoader();
+      },
+      (ev)=>{
+        const pct = Math.min(100, Math.round((ev.loaded / (ev.total||1))*100));
+        barEl.style.width = pct + '%';
+        statusEl.textContent = 'Loading… ' + pct + '%';
+      },
+      (err)=>{
+        console.error(err);
+        showError('Failed to load model. Ensure assets/eagle.glb exists.');
+      }
+    );
+
+    function frameObject(obj){
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fitDist = (maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2))) * 1.25;
+      controls.target.copy(center);
+      camera.position.copy(center).add(new THREE.Vector3(fitDist*0.7, fitDist*0.6, fitDist*0.9));
+      camera.near = Math.max(0.01, maxDim/1000);
+      camera.far = Math.max(50, fitDist*10);
+      camera.updateProjectionMatrix();
+    }
+
+    function hideLoader(){ loaderEl.classList.add('hidden'); }
+    function showError(msg){
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+
+    let resizePending = false;
+    addEventListener('resize', ()=>{
+      if (resizePending) return;
+      resizePending = true;
+      requestAnimationFrame(()=>{
+        resizePending = false;
+        const w = innerWidth, h = innerHeight;
+        camera.aspect = w/h; camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      });
+    });
+
+    addEventListener('dblclick', ()=>{ if (model) frameObject(model); });
+
+    function tick(){
+      requestAnimationFrame(tick);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    tick();
+  </script>
+</body>
+</html>
