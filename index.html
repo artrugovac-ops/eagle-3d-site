@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AZR • Illyrian Eagle 3D</title>
+  <meta name="description" content="Real-time 3D Illyrian eagle render. Drag to orbit, scroll to zoom." />
+  <link rel="preload" href="assets/eagle.glb" as="fetch" crossorigin="anonymous">
+  <link rel="stylesheet" href="styles/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="label">
+      <h1>AZR Illyrian Eagle</h1>
+      <p>Drag to orbit • Scroll/Pinch to zoom • Double-tap to reframe</p>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="c"></canvas>
+      <div id="loader" class="show">
+        <div class="spinner"></div>
+        <div class="progress">
+          <div class="bar" id="bar" style="width:0%"></div>
+        </div>
+        <p id="status">Loading model…</p>
+      </div>
+      <div id="error" class="hidden"></div>
+    </div>
+    <footer>
+      <span>© AZR Auto Group</span>
+      <a href="https://github.com/" target="_blank" rel="noopener">GitHub Pages ready</a>
+    </footer>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
