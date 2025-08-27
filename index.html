@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AZR • Illyrian Eagle 3D</title>
-  <meta name="description" content="Ultra-lean Three.js viewer for the Illyrian eagle. Drag to orbit, scroll to zoom." />
+  <title>AZR • Generic Base</title>
+  <meta name="description" content="Generic, extensible base site with a 3D hero ready for animation.">
 
-  <!-- Import map: resolves bare imports to CDN files -->
+  <!-- Import map for Three.js + addons -->
   <script type="importmap">
   {
     "imports": {
@@ -15,172 +15,76 @@
     }
   }
   </script>
+  <!-- Wider browser support (safe no-op where native) -->
+  <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 
   <link rel="icon" href="favicon.ico">
-  <style>
-    :root{--bg:#0b0b0d;--fg:#eef1f6;--muted:#9aa1ad;--ring:#262630}
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0}
-    body{background:var(--bg);color:var(--fg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    #hud{position:fixed;left:12px;top:12px;background:rgba(19,19,24,.72);backdrop-filter:blur(8px);border:1px solid var(--ring);padding:10px 12px;border-radius:14px}
-    #hud h1{margin:0 0 2px;font-size:16px}
-    #hud p{margin:0;color:var(--muted);font-size:12px}
-    #wrap{position:fixed;inset:0}
-    canvas{display:block;width:100%;height:100%}
-    #loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-      background:linear-gradient(180deg, rgba(11,11,13,.92), rgba(11,11,13,.55));transition:opacity .3s ease}
-    #loader.hidden{opacity:0;pointer-events:none}
-    .spinner{width:36px;height:36px;border-radius:999px;border:3px solid #2a2a35;border-top-color:#fff;animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .bar{width:min(360px,80vw);height:6px;background:#1a1a22;border:1px solid #2a2a35;border-radius:999px;overflow:hidden}
-    .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#4fc3f7,#81c784,#fdd835)}
-    footer{position:fixed;right:12px;bottom:12px;background:rgba(19,19,24,.72);border:1px solid var(--ring);padding:8px 10px;border-radius:12px;color:var(--muted);font-size:12px}
-    #error{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#2a1b1b;color:#ffdede;border:1px solid #4b2e2e;padding:12px 14px;border-radius:12px;display:none;max-width:92vw}
-  </style>
+  <link rel="stylesheet" href="styles/app.css">
 </head>
 <body>
-  <div id="hud">
-    <h1>AZR Illyrian Eagle</h1>
-    <p>Drag to orbit • Scroll to zoom • Double-tap to reframe</p>
-  </div>
-  <div id="wrap">
-    <canvas id="c"></canvas>
-    <div id="loader">
-      <div class="spinner"></div>
-      <div class="bar"><i id="bar"></i></div>
-      <div id="status">Loading…</div>
+  <!-- Header / Nav -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">AZR</div>
+      <nav class="nav">
+        <a href="#hero">Home</a>
+        <a href="#features">Features</a>
+        <a href="#contact">Contact</a>
+      </nav>
     </div>
-    <div id="error"></div>
-  </div>
-  <footer>© AZR Auto Group • Pages-ready</footer>
+  </header>
 
-  <script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  <!-- Hero (3D canvas lives here) -->
+  <section id="hero" class="hero">
+    <canvas id="eagle-canvas" aria-label="3D Hero"></canvas>
 
-    // ---- Config ----
-    const MODEL_URL = 'assets/eagle.glb';
+    <!-- overlay UI (minimal, we’ll extend during animation step) -->
+    <div class="hero-overlay">
+      <h1>Generic Site Base</h1>
+      <p>3D hero is ready. Next step: animation timeline.</p>
+      <div class="hero-actions">
+        <button id="btnReset">Reset View</button>
+        <button id="btnQuality">HQ</button>
+      </div>
+    </div>
 
-    // ---- Core ----
-    const canvas = document.getElementById('c');
-    const loaderEl = document.getElementById('loader');
-    const barEl = document.getElementById('bar');
-    const statusEl = document.getElementById('status');
-    const errorEl = document.getElementById('error');
+    <!-- loader / status -->
+    <div id="loader" class="loader show">
+      <div class="spinner"></div>
+      <div class="progress"><i id="bar" style="width:0%"></i></div>
+      <p id="status">Loading…</p>
+    </div>
+    <div id="error" class="error" hidden></div>
+  </section>
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-    renderer.shadowMap.enabled = true;
+  <!-- Content scaffolding -->
+  <section id="features" class="section">
+    <div class="container">
+      <h2>Features</h2>
+      <p>Placeholder content. We’ll wire real sections later (inventory, CMS, etc.).</p>
+      <div class="grid">
+        <div class="card"><h3>Fast</h3><p>CDN modules, no bundler.</p></div>
+        <div class="card"><h3>Lean</h3><p>Minimal files, clean styles.</p></div>
+        <div class="card"><h3>Ready</h3><p>Animation hooks in JS.</p></div>
+      </div>
+    </div>
+  </section>
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0b0d);
+  <section id="contact" class="section alt">
+    <div class="container">
+      <h2>Contact</h2>
+      <p>Put your contact block here.</p>
+    </div>
+  </section>
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.05, 2000);
-    camera.position.set(0.8, 0.7, 1.4);
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© AZR Auto Group</span>
+      <a href="https://github.com/" target="_blank" rel="noopener">GitHub Pages</a>
+    </div>
+  </footer>
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 0.45;
-    controls.maxDistance = 6;
-    controls.maxPolarAngle = Math.PI * 0.495;
-    controls.target.set(0, 0.15, 0);
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x111122, 0.9));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.25);
-    dir.position.set(2.5, 3.4, 2.0);
-    dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
-    scene.add(dir);
-
-    const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(4, 64),
-      new THREE.MeshStandardMaterial({ color:0x0f0f13, roughness:0.95, metalness:0.05 })
-    );
-    floor.receiveShadow = true;
-    floor.rotation.x = -Math.PI/2;
-    floor.position.y = -0.001;
-    scene.add(floor);
-
-    // ---- Loaders (GLTF + DRACO) ----
-    const gltfLoader = new GLTFLoader();
-    const draco = new DRACOLoader();
-    // Use the DRACO decoders hosted with three examples:
-    draco.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
-    gltfLoader.setDRACOLoader(draco);
-
-    let model;
-
-    gltfLoader.load(
-      MODEL_URL,
-      (gltf)=>{
-        model = gltf.scene;
-        model.traverse(o=>{
-          if (o.isMesh) {
-            o.castShadow = true; o.receiveShadow = true;
-            if (o.material && o.material.metalness !== undefined) {
-              o.material.metalness = Math.min(0.85, o.material.metalness ?? 0.2);
-              o.material.roughness = Math.max(0.25, o.material.roughness ?? 0.4);
-            }
-          }
-        });
-        scene.add(model);
-        frameObject(model);
-        hideLoader();
-      },
-      (ev)=>{
-        const pct = Math.min(100, Math.round((ev.loaded / (ev.total||1))*100));
-        barEl.style.width = pct + '%';
-        statusEl.textContent = 'Loading… ' + pct + '%';
-      },
-      (err)=>{
-        console.error(err);
-        showError('Failed to load model. Ensure assets/eagle.glb exists.');
-      }
-    );
-
-    function frameObject(obj){
-      const box = new THREE.Box3().setFromObject(obj);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const fitDist = (maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2))) * 1.25;
-      controls.target.copy(center);
-      camera.position.copy(center).add(new THREE.Vector3(fitDist*0.7, fitDist*0.6, fitDist*0.9));
-      camera.near = Math.max(0.01, maxDim/1000);
-      camera.far = Math.max(50, fitDist*10);
-      camera.updateProjectionMatrix();
-    }
-
-    function hideLoader(){ loaderEl.classList.add('hidden'); }
-    function showError(msg){ errorEl.textContent = msg; errorEl.style.display = 'block'; }
-
-    let resizePending = false;
-    addEventListener('resize', ()=>{
-      if (resizePending) return;
-      resizePending = true;
-      requestAnimationFrame(()=>{
-        resizePending = false;
-        const w = innerWidth, h = innerHeight;
-        camera.aspect = w/h; camera.updateProjectionMatrix();
-        renderer.setSize(w, h, false);
-      });
-    });
-
-    addEventListener('dblclick', ()=>{ if (model) frameObject(model); });
-
-    function tick(){
-      requestAnimationFrame(tick);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    tick();
-  </script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
