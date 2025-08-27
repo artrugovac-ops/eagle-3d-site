@@ -6,16 +6,20 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 /* ===== DOM / constants ===== */
 const canvas = document.getElementById('eagle-canvas');
 
-const BADGE_PX = 180;              // identical on desktop & mobile
-const BADGE_PX_TINY = 148;         // for very small screens (<360px)
-const OFFSET_PX = 20;              // corner offset
-const TINY_BP = 360;               // px
+const BADGE_PX        = 180;               // same on desktop & mobile
+const BADGE_PX_TINY   = 148;               // for very small screens (<360px)
+const OFFSET_PX       = 20;                // corner offset
+const TINY_BP         = 360;               // px
 
-const INTRO_TIME = 2.0;            // seconds
-const SPIN_BADGE_RPS = (Math.PI * 2) / 10; // 10s per rotation -> ~0.628 rad/s (clockwise)
-const KEY_DRIFT_AMPL = THREE.MathUtils.degToRad(10); // ±10°
-const KEY_DRIFT_PERIOD = 8.0;      // seconds
-const RIM_INTENSITY = 0.9;         // stronger rim for chrome edges
+const INTRO_TIME      = 2.0;               // seconds total
+const SPIN_BADGE_RPS  = (Math.PI * 2) / 10; // 10s per rotation (clockwise)
+const KEY_DRIFT_AMPL  = THREE.MathUtils.degToRad(10); // ±10°
+const KEY_DRIFT_PERIOD= 8.0;               // seconds
+const RIM_INTENSITY   = 0.9;               // stronger rim for chrome edges
+
+/* ===== utilities (declare once) ===== */
+function isTiny(){ return window.innerWidth < TINY_BP; }
+function badgeSize(){ return isTiny() ? BADGE_PX_TINY : BADGE_PX; }
 
 /* ===== Renderer ===== */
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -62,7 +66,7 @@ gltfLoader.load(
   (gltf) => {
     model = gltf.scene;
 
-    // Chrome look with strong reflections
+    // Chrome look with real reflections
     model.traverse((o) => {
       if (o.isMesh && o.material && 'metalness' in o.material && 'roughness' in o.material) {
         o.material.metalness = 1.0;
@@ -79,9 +83,6 @@ gltfLoader.load(
 );
 
 /* ===== Layout helpers ===== */
-function isTiny() { return window.innerWidth < TINY_BP; }
-function badgeSize() { return isTiny() ? BADGE_PX_TINY : BADGE_PX; }
-
 function setCanvasBox(left, top, size) {
   canvas.style.position = 'fixed';
   canvas.style.left = `${left}px`;
@@ -102,7 +103,7 @@ function finalBadgeBox() {
   return { left: OFFSET_PX, top: OFFSET_PX, size };
 }
 
-/* Frame model for a given square box; final badge uses flat/front view */
+/* Frame model for a given square box; badge uses flat/front view */
 function frameForBoxFlat(obj, sizePx, pad = 1.12) {
   const box = new THREE.Box3().setFromObject(obj);
   const dim = box.getSize(new THREE.Vector3());
@@ -127,7 +128,6 @@ let pausedHover = false;
 
 function startIntro() {
   const start = centerStartBox();
-  const end = finalBadgeBox();
 
   // Start large, centered
   setCanvasBox(start.left, start.top, start.size);
@@ -149,7 +149,7 @@ function loop(now) {
   const dt = Math.min(0.033, (now - (loop._last || now)) / 1000);
   loop._last = now;
 
-  // Drift key light for rolling highlight (always on)
+  // Rolling highlight
   const driftPhase = (now / 1000) / KEY_DRIFT_PERIOD * Math.PI * 2;
   const drift = Math.sin(driftPhase) * KEY_DRIFT_AMPL;
   key.position.set(2.6 * Math.cos(drift), 3.2, 2.1 * Math.sin(drift));
@@ -177,25 +177,29 @@ function loop(now) {
       renderer.toneMappingExposure = 1.0;
     }
 
-    // Arc Glide path (0.30–1.60s): bezier-ish via eased lerp
+    // Arc Glide path (0.30–1.60s): bezier-ish via eased lerp with slight arc
     const moveT = clamp01((elapsed - 0.30) / (1.60 - 0.30));
     const e = easeOutCubic(moveT);
 
-    // Control a slight arc by biasing Y (up) a touch before settling
-    const arcBias = Math.sin(e * Math.PI) * 0.12; // 0..~0.12
-    const left = start.left + (end.left - start.left) * e;
-    const top  = start.top  + (end.top  - start.top ) * (e * (1 - 0.10) + arcBias * 0.10);
-    const size = start.size + (end.size - start.size) * e;
+    // compute end target only once per frame
+    const leftTarget = end.left;
+    const topTarget  = end.top;
+    const sizeTarget = end.size;
+
+    const left = start.left + (leftTarget - start.left) * e;
+    const arcBias = Math.sin(e * Math.PI) * 0.12; // tiny arc lift
+    const top  = start.top + (topTarget - start.top) * (e * (1 - 0.10) + arcBias * 0.10);
+    const size = start.size + (sizeTarget - start.size) * e;
 
     setCanvasBox(left, top, size);
     renderer.setSize(size, size, false);
     camera.aspect = 1; camera.updateProjectionMatrix();
 
-    // Clockwise spin across the entire intro (~90° total)
+    // Clockwise spin across intro (~90° total)
     if (model) {
       const totalYaw = THREE.MathUtils.degToRad(90) * clamp01(elapsed / INTRO_TIME);
-      model.rotation.y = -totalYaw; // negative for clockwise in screen space
-      // Gentle, **temporary** float while traveling so it never looks dead
+      model.rotation.y = -totalYaw; // negative = clockwise
+      // Gentle temporary float while moving so it never looks dead
       if (elapsed <= 1.6) {
         const bob = Math.sin(elapsed * Math.PI * 1.2) * 0.015;
         const tilt = Math.sin(elapsed * Math.PI * 0.8) * THREE.MathUtils.degToRad(1.2);
@@ -216,7 +220,6 @@ function loop(now) {
     if (elapsed >= INTRO_TIME) {
       const b = finalBadgeBox();
       setCanvasBox(b.left, b.top, b.size);
-      // Flat/front framing for badge, no tilt, no bob
       if (model) {
         model.position.set(0, 0, 0);
         model.rotation.x = 0;
@@ -226,7 +229,7 @@ function loop(now) {
       introDone = true;
     }
   } else {
-    // BADGE STATE — continuous clockwise spin (no bob, no tilt)
+    // BADGE STATE — continuous clockwise spin (flat, no bob)
     const target = badgeSize();
     if (Math.abs(canvas.clientWidth - target) > 1) {
       renderer.setSize(target, target, false);
@@ -237,7 +240,6 @@ function loop(now) {
     }
     if (!pausedHover && model) {
       model.rotation.y -= SPIN_BADGE_RPS * dt; // clockwise
-      // keep flat
       model.rotation.x = 0;
       model.rotation.z = 0;
       model.position.y = 0;
@@ -261,8 +263,3 @@ window.addEventListener('resize', () => {
   camera.aspect = 1; camera.updateProjectionMatrix();
   frameForBoxFlat(model, b.size, 1.12);
 });
-
-/* ===== utilities ===== */
-function badgeSize(){ return isTiny() ? BADGE_PX_TINY : BADGE_PX; }
-function isTiny(){ return window.innerWidth < TINY_BP; }
-
