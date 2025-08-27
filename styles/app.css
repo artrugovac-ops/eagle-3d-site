@@ -14,13 +14,12 @@ body{background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-a
 .nav a{color:var(--fg);text-decoration:none;margin-left:16px;opacity:.85}
 .nav a:hover{opacity:1}
 
-/* Sections (keep your content intact) */
+/* Sections */
 .section{padding:56px 0;border-top:1px solid var(--line)}
 .section.alt{background:#0e0e12}
-.section h2{margin:0 0 10px}
+.section h1,.section h2{margin:0 0 10px}
+.section p{color:var(--muted)}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.card{background:#121219;border:1px solid var(--line);border-radius:14px;padding:16px}
-.card h3{margin:0 0 6px}
 
 /* Footer */
 .site-footer{border-top:1px solid var(--line);padding:18px 0;background:#0d0d11}
@@ -28,24 +27,40 @@ body{background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-a
 .footer-inner a{color:#cfd6ff;text-decoration:none;border-bottom:1px dotted #4b4b55}
 
 /* ===== BADGE CANVAS ===== */
-/* We animate size/position from JS; defaults here are harmless. */
 #eagle-canvas{
-  position: fixed;           /* JS animates left/top/size */
-  left: 20px;
-  top: 20px;
-  width: 180px;
-  height: 180px;
-  z-index: 11;               /* above header, below any modals */
-  pointer-events: auto;      /* so hover pause works on desktop */
-  border: 0;
+  position:fixed;
+  left:20px;
+  top:20px;
+  width:160px;              /* final badge size (same desktop/mobile) */
+  height:160px;
+  z-index:11;               /* above header, below overlays */
+  pointer-events:auto;      /* hover pause works on desktop */
+  border:0;
 }
 
-/* Optional: tiny screens < 360px (JS also handles this) */
+/* Tiny screens (optional) */
 @media (max-width: 359px){
   #eagle-canvas{
-    left: 16px;
-    top: 16px;
-    width: 148px;
-    height: 148px;
+    left:16px; top:16px;
+    width:148px; height:148px;
   }
+}
+
+/* ===== Entry FX overlays ===== */
+
+/* Flash: soft radial pop */
+#fx-flash{
+  position:fixed; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse at center, rgba(255,255,255,0.35), rgba(255,255,255,0) 60%);
+  opacity:0; transition:opacity .28s ease;
+  z-index:12;
+}
+
+/* Diagonal sweep bar */
+#fx-sweep{
+  position:fixed; left:-30vw; top:-20vh; width:60vw; height:140vh;
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.25), rgba(255,255,255,0));
+  transform:rotate(-18deg) translateX(-120vw);
+  filter:blur(2px);
+  opacity:0; pointer-events:none; z-index:12;
 }
