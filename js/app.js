@@ -263,3 +263,4 @@ window.addEventListener('resize', () => {
   renderer.setSize(b.size, b.size, false);
   camera.aspect = 1; camera.updateProjectionMatrix();
 });
+
