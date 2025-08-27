@@ -6,14 +6,16 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 /* ===== DOM / constants ===== */
 const canvas = document.getElementById('eagle-canvas');
 
-const BADGE_SIZE = 180;     // identical on desktop & mobile
-const BADGE_SIZE_TINY = 148; // if viewport < 360px
-const OFFSET = 20;
-const TINY_BP = 360;
+const BADGE_PX = 180;              // identical on desktop & mobile
+const BADGE_PX_TINY = 148;         // for very small screens (<360px)
+const OFFSET_PX = 20;              // corner offset
+const TINY_BP = 360;               // px
 
-const SPIN_SPEED = THREE.MathUtils.degToRad(0.18);  // badge idle spin
-const BOB_PIXELS = 5;    // visually small; we convert to world units
-const INTRO_TIME = 2.0;  // total seconds
+const INTRO_TIME = 2.0;            // seconds
+const SPIN_BADGE_RPS = (Math.PI * 2) / 10; // 10s per rotation -> ~0.628 rad/s (clockwise)
+const KEY_DRIFT_AMPL = THREE.MathUtils.degToRad(10); // ±10°
+const KEY_DRIFT_PERIOD = 8.0;      // seconds
+const RIM_INTENSITY = 0.9;         // stronger rim for chrome edges
 
 /* ===== Renderer ===== */
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -23,33 +25,28 @@ renderer.setSize(badgeSize(), badgeSize(), false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = false;
 
-/* ===== Scene + Environment (this makes chrome SHINE) ===== */
+/* ===== Scene + environment (real reflections) ===== */
 const scene = new THREE.Scene();
 scene.background = null;
 const pmrem = new THREE.PMREMGenerator(renderer);
-const env = new RoomEnvironment();
-const envTex = pmrem.fromScene(env).texture;
-scene.environment = envTex;  // <-- key: reflections for metallic materials
+const envTex = pmrem.fromScene(new RoomEnvironment()).texture;
+scene.environment = envTex;
 
 /* ===== Camera ===== */
 const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 2000);
 
 /* ===== Lights ===== */
-// Key light (main)
-const key = new THREE.DirectionalLight(0xffffff, 1.6);
-key.position.set(2.5, 3.4, 2.0);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 0.65);
+scene.add(hemi);
+
+const key = new THREE.DirectionalLight(0xffffff, 1.8);
+key.position.set(2.6, 3.2, 2.1);
 scene.add(key);
 
-// Rim light (soft edge highlight)
-const rim = new THREE.DirectionalLight(0xffffff, 0.6);
-rim.position.set(-2.0, 2.5, -2.0);
+const rim = new THREE.DirectionalLight(0xffffff, RIM_INTENSITY);
+rim.position.set(-2.0, 2.4, -2.0);
 scene.add(rim);
-
-// Fill (ambient)
-const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 0.6);
-scene.add(hemi);
 
 /* ===== Model load ===== */
 const MODEL_URL = 'assets/eagle.glb';
@@ -65,16 +62,12 @@ gltfLoader.load(
   (gltf) => {
     model = gltf.scene;
 
-    // Normalize materials for chrome look but keep original where present
+    // Chrome look with strong reflections
     model.traverse((o) => {
-      if (o.isMesh) {
-        const m = o.material;
-        if (m && 'metalness' in m && 'roughness' in m) {
-          // Chrome settings now actually reflect the environment
-          m.metalness = 1.0;
-          m.roughness = 0.12;
-          m.envMapIntensity = 1.0;
-        }
+      if (o.isMesh && o.material && 'metalness' in o.material && 'roughness' in o.material) {
+        o.material.metalness = 1.0;
+        o.material.roughness = 0.09;
+        o.material.envMapIntensity = 1.4;
       }
     });
 
@@ -87,7 +80,7 @@ gltfLoader.load(
 
 /* ===== Layout helpers ===== */
 function isTiny() { return window.innerWidth < TINY_BP; }
-function badgeSize() { return isTiny() ? BADGE_SIZE_TINY : BADGE_SIZE; }
+function badgeSize() { return isTiny() ? BADGE_PX_TINY : BADGE_PX; }
 
 function setCanvasBox(left, top, size) {
   canvas.style.position = 'fixed';
@@ -106,29 +99,31 @@ function centerStartBox() {
 
 function finalBadgeBox() {
   const size = badgeSize();
-  return { left: OFFSET, top: OFFSET, size };
+  return { left: OFFSET_PX, top: OFFSET_PX, size };
 }
 
-function frameForBox(obj, sizePx, pad = 1.15) {
+/* Frame model for a given square box; final badge uses flat/front view */
+function frameForBoxFlat(obj, sizePx, pad = 1.12) {
   const box = new THREE.Box3().setFromObject(obj);
   const dim = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(dim.x, dim.y, dim.z);
-  const fov = THREE.MathUtils.degToRad(camera.fov);
-  const dist = (maxDim / (2 * Math.tan(fov / 2))) * pad;
   const center = box.getCenter(new THREE.Vector3());
-  camera.position.copy(center).add(new THREE.Vector3(dist * 0.7, dist * 0.6, dist * 0.9));
+  const maxDim = Math.max(dim.x, dim.y, dim.z);
+
+  const dist = (maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))) * pad;
+
+  camera.position.set(center.x, center.y, center.z + dist); // front-on (flat)
   camera.near = Math.max(0.01, maxDim / 1000);
   camera.far = Math.max(50, dist * 10);
   camera.lookAt(center);
   camera.updateProjectionMatrix();
+
   renderer.setSize(sizePx, sizePx, false);
 }
 
-/* ===== Intro timeline ===== */
+/* ===== Intro timeline (Arc Glide) ===== */
 let t0 = 0;
 let introDone = false;
 let pausedHover = false;
-let floatPhase = 0;
 
 function startIntro() {
   const start = centerStartBox();
@@ -136,114 +131,116 @@ function startIntro() {
 
   // Start large, centered
   setCanvasBox(start.left, start.top, start.size);
-  frameForBox(model, start.size, 1.05); // a tad tighter for drama
+  frameForBoxFlat(model, start.size, 1.05);
 
-  // Initial pose: slight tilt so it doesn’t feel dead
-  if (model) {
-    model.rotation.set(THREE.MathUtils.degToRad(2), 0, THREE.MathUtils.degToRad(-1));
-  }
+  // Subtle initial pose so it’s not rigid
+  model.rotation.set(THREE.MathUtils.degToRad(1.5), 0, THREE.MathUtils.degToRad(-1));
 
-  // Time origin
   t0 = performance.now();
   introDone = false;
 
   requestAnimationFrame(loop);
 }
 
-/* Smooth cubic-out */
 const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
 function loop(now) {
   const dt = Math.min(0.033, (now - (loop._last || now)) / 1000);
   loop._last = now;
-  const elapsed = (now - t0) / 1000;
 
-  // Subtle environment drift to keep chrome alive (very slow)
-  const drift = Math.sin(now / 1000 / 10.0 * Math.PI * 2) * THREE.MathUtils.degToRad(6);
-  key.position.set(2.5 * Math.cos(drift), 3.4, 2.0 * Math.sin(drift));
-  rim.position.set(-2.0 * Math.cos(drift * 0.8), 2.5, -2.0 * Math.sin(drift * 0.8));
+  // Drift key light for rolling highlight (always on)
+  const driftPhase = (now / 1000) / KEY_DRIFT_PERIOD * Math.PI * 2;
+  const drift = Math.sin(driftPhase) * KEY_DRIFT_AMPL;
+  key.position.set(2.6 * Math.cos(drift), 3.2, 2.1 * Math.sin(drift));
+  key.lookAt(0, 0, 0);
 
   if (!introDone) {
+    const elapsed = (now - t0) / 1000;
     const start = centerStartBox();
     const end = finalBadgeBox();
 
-    // — Flash pop & sparkle (0–0.30s) —
+    // Flash pop (0–0.30s) + sparkle
     if (elapsed <= 0.30) {
       const t = elapsed / 0.30;
-      key.intensity = 1.6 + t * 0.9;             // up to 2.5
-      rim.intensity = 0.6 + t * 0.6;             // rim brightens briefly
+      key.intensity = 1.8 + t * 0.9;          // up to ~2.7
+      rim.intensity = RIM_INTENSITY + t * 0.5;
       renderer.toneMappingExposure = 1.0 + t * 0.12;
     } else if (elapsed <= 0.42) {
       const t = (elapsed - 0.30) / 0.12;
-      key.intensity = 2.5 - t * 0.9;             // fall back to ~1.6
-      rim.intensity = 1.2 - t * 0.6;             // fall back to 0.6
+      key.intensity = 2.7 - t * 0.9;          // ease back to ~1.8
+      rim.intensity = (RIM_INTENSITY + 0.5) - t * 0.5;
       renderer.toneMappingExposure = 1.12 - t * 0.12;
     } else {
-      key.intensity = 1.6;
-      rim.intensity = 0.6;
+      key.intensity = 1.8;
+      rim.intensity = RIM_INTENSITY;
       renderer.toneMappingExposure = 1.0;
     }
 
-    // — Travel (0.30–1.60s) —
+    // Arc Glide path (0.30–1.60s): bezier-ish via eased lerp
     const moveT = clamp01((elapsed - 0.30) / (1.60 - 0.30));
     const e = easeOutCubic(moveT);
 
-    // Bezier-ish curve to top-left (ease adds curvature)
+    // Control a slight arc by biasing Y (up) a touch before settling
+    const arcBias = Math.sin(e * Math.PI) * 0.12; // 0..~0.12
     const left = start.left + (end.left - start.left) * e;
-    const top  = start.top  + (end.top  - start.top ) * e;
+    const top  = start.top  + (end.top  - start.top ) * (e * (1 - 0.10) + arcBias * 0.10);
     const size = start.size + (end.size - start.size) * e;
+
     setCanvasBox(left, top, size);
     renderer.setSize(size, size, false);
     camera.aspect = 1; camera.updateProjectionMatrix();
 
-    // Model motion so it never feels stagnant
+    // Clockwise spin across the entire intro (~90° total)
     if (model) {
-      // Yaw total ~90° across whole intro
-      model.rotation.y = THREE.MathUtils.degToRad(90) * clamp01(elapsed / INTRO_TIME);
-      // Float (translate small amount in world space)
-      floatPhase += dt * (Math.PI * 2 / 8);
-      const bobWorld = (BOB_PIXELS / size) * 0.5; // convert pixels to ~world
-      model.position.y = Math.sin(floatPhase) * bobWorld;
-      const tilt = Math.sin(floatPhase * 0.6) * THREE.MathUtils.degToRad(1.6);
-      model.rotation.z = tilt * 0.7;
-      model.rotation.x = tilt * 0.35;
+      const totalYaw = THREE.MathUtils.degToRad(90) * clamp01(elapsed / INTRO_TIME);
+      model.rotation.y = -totalYaw; // negative for clockwise in screen space
+      // Gentle, **temporary** float while traveling so it never looks dead
+      if (elapsed <= 1.6) {
+        const bob = Math.sin(elapsed * Math.PI * 1.2) * 0.015;
+        const tilt = Math.sin(elapsed * Math.PI * 0.8) * THREE.MathUtils.degToRad(1.2);
+        model.position.y = bob;
+        model.rotation.z = tilt * 0.6;
+        model.rotation.x = tilt * 0.3;
+      }
     }
 
-    // — Glint sweep during settle (1.60–2.00s) —
+    // Glint sweep during settle (1.60–2.00s)
     if (elapsed >= 1.60 && elapsed <= 2.00) {
       const t = (elapsed - 1.60) / 0.40;
-      const extra = THREE.MathUtils.degToRad(14);
-      const phase = -THREE.MathUtils.degToRad(6) + t * (THREE.MathUtils.degToRad(12) + extra);
-      key.position.set(2.5 * Math.cos(phase), 3.4, 2.0 * Math.sin(phase));
+      const phase = -THREE.MathUtils.degToRad(12) + t * THREE.MathUtils.degToRad(32);
+      key.position.set(2.6 * Math.cos(phase), 3.2, 2.1 * Math.sin(phase));
     }
 
-    // End intro
+    // Land & lock
     if (elapsed >= INTRO_TIME) {
       const b = finalBadgeBox();
       setCanvasBox(b.left, b.top, b.size);
-      frameForBox(model, b.size, 1.15);
+      // Flat/front framing for badge, no tilt, no bob
+      if (model) {
+        model.position.set(0, 0, 0);
+        model.rotation.x = 0;
+        model.rotation.z = 0;
+      }
+      frameForBoxFlat(model, b.size, 1.12);
       introDone = true;
     }
   } else {
-    // BADGE STATE — continuous slow spin + subtle float (unless hover paused)
-    const bSize = badgeSize();
-    if (Math.abs(canvas.clientWidth - bSize) > 1) {
-      renderer.setSize(bSize, bSize, false);
+    // BADGE STATE — continuous clockwise spin (no bob, no tilt)
+    const target = badgeSize();
+    if (Math.abs(canvas.clientWidth - target) > 1) {
+      renderer.setSize(target, target, false);
       const b = finalBadgeBox();
       setCanvasBox(b.left, b.top, b.size);
       camera.aspect = 1; camera.updateProjectionMatrix();
+      frameForBoxFlat(model, b.size, 1.12);
     }
-
     if (!pausedHover && model) {
-      model.rotation.y += SPIN_SPEED * dt;
-
-      floatPhase += dt * (Math.PI * 2 / 8);
-      const bobWorld = (BOB_PIXELS / bSize) * 0.5;
-      model.position.y = Math.sin(floatPhase) * bobWorld;
-      const tilt = Math.sin(floatPhase * 0.6) * THREE.MathUtils.degToRad(1.6);
-      model.rotation.z = tilt * 0.7;
-      model.rotation.x = tilt * 0.35;
+      model.rotation.y -= SPIN_BADGE_RPS * dt; // clockwise
+      // keep flat
+      model.rotation.x = 0;
+      model.rotation.z = 0;
+      model.position.y = 0;
     }
   }
 
@@ -251,16 +248,21 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-/* ===== Hover pause (desktop) ===== */
+/* Hover pause (desktop only) */
 canvas.addEventListener('mouseenter', () => { pausedHover = true; });
 canvas.addEventListener('mouseleave', () => { pausedHover = false; });
 
-/* ===== Resize ===== */
+/* Resize: keep badge crisp and in place */
 window.addEventListener('resize', () => {
   if (!introDone) return;
   const b = finalBadgeBox();
   setCanvasBox(b.left, b.top, b.size);
   renderer.setSize(b.size, b.size, false);
   camera.aspect = 1; camera.updateProjectionMatrix();
+  frameForBoxFlat(model, b.size, 1.12);
 });
+
+/* ===== utilities ===== */
+function badgeSize(){ return isTiny() ? BADGE_PX_TINY : BADGE_PX; }
+function isTiny(){ return window.innerWidth < TINY_BP; }
 
