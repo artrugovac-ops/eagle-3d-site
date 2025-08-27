@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AZR • Generic Base</title>
-  <meta name="description" content="Generic, extensible base site with a 3D hero ready for animation.">
+  <title>AZR • Eagle Badge</title>
+  <meta name="description" content="Clean dealership base with a premium 3D chrome eagle badge.">
 
   <!-- Import map for Three.js + addons -->
   <script type="importmap">
@@ -15,73 +15,59 @@
     }
   }
   </script>
-  <!-- Wider browser support (safe no-op where native) -->
   <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 
   <link rel="icon" href="favicon.ico">
   <link rel="stylesheet" href="styles/app.css">
 </head>
 <body>
-  <!-- Header / Nav -->
+  <!-- Header / Nav (keep or adjust as you like) -->
   <header class="site-header">
     <div class="container header-inner">
       <div class="brand">AZR</div>
       <nav class="nav">
-        <a href="#hero">Home</a>
-        <a href="#features">Features</a>
+        <a href="#home">Home</a>
+        <a href="#inventory">Inventory</a>
         <a href="#contact">Contact</a>
       </nav>
     </div>
   </header>
 
-  <!-- Hero (3D canvas lives here) -->
-  <section id="hero" class="hero">
-    <canvas id="eagle-canvas" aria-label="3D Hero"></canvas>
+  <!-- 3D Badge Canvas -->
+  <canvas id="eagle-canvas" aria-label="AZR Eagle 3D badge"></canvas>
 
-    <!-- overlay UI (minimal, we’ll extend during animation step) -->
-    <div class="hero-overlay">
-      <h1>Generic Site Base</h1>
-      <p>3D hero is ready. Next step: animation timeline.</p>
-      <div class="hero-actions">
-        <button id="btnReset">Reset View</button>
-        <button id="btnQuality">HQ</button>
+  <!-- Entry impact overlays (page-level FX) -->
+  <div id="fx-flash" aria-hidden="true"></div>
+  <div id="fx-sweep" aria-hidden="true"></div>
+
+  <!-- Content scaffold -->
+  <main>
+    <section id="home" class="section">
+      <div class="container">
+        <h1>Welcome to AZR Auto Group</h1>
+        <p>Premium vehicles coming online soon. The eagle badge is live and polished.</p>
       </div>
-    </div>
+    </section>
 
-    <!-- loader / status -->
-    <div id="loader" class="loader show">
-      <div class="spinner"></div>
-      <div class="progress"><i id="bar" style="width:0%"></i></div>
-      <p id="status">Loading…</p>
-    </div>
-    <div id="error" class="error" hidden></div>
-  </section>
-
-  <!-- Content scaffolding -->
-  <section id="features" class="section">
-    <div class="container">
-      <h2>Features</h2>
-      <p>Placeholder content. We’ll wire real sections later (inventory, CMS, etc.).</p>
-      <div class="grid">
-        <div class="card"><h3>Fast</h3><p>CDN modules, no bundler.</p></div>
-        <div class="card"><h3>Lean</h3><p>Minimal files, clean styles.</p></div>
-        <div class="card"><h3>Ready</h3><p>Animation hooks in JS.</p></div>
+    <section id="inventory" class="section alt">
+      <div class="container">
+        <h2>Inventory</h2>
+        <p>Plug your real listings here later.</p>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section id="contact" class="section alt">
-    <div class="container">
-      <h2>Contact</h2>
-      <p>Put your contact block here.</p>
-    </div>
-  </section>
+    <section id="contact" class="section">
+      <div class="container">
+        <h2>Contact</h2>
+        <p>Drop your contact info here.</p>
+      </div>
+    </section>
+  </main>
 
-  <!-- Footer -->
   <footer class="site-footer">
     <div class="container footer-inner">
       <span>© AZR Auto Group</span>
-      <a href="https://github.com/" target="_blank" rel="noopener">GitHub Pages</a>
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub Pages</a>
     </div>
   </footer>
 
